@@ -1,0 +1,6 @@
+@PlateSecure_HostAddress = http://localhost:5296
+
+GET {{PlateSecure_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
