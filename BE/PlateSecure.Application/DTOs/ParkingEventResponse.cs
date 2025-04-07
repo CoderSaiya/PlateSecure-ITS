@@ -9,4 +9,6 @@ public sealed record ParkingEventResponse(
     double Fee, 
     bool IsPaid, 
     DateTime CreateDate, 
-    DateTime UpdateDate);
+    DateTime UpdateDate,
+    DetectionResponse? EntryLog,
+    DetectionResponse? ExitLog);

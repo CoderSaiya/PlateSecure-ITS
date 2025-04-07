@@ -1,14 +1,14 @@
-﻿using MongoDB.Bson;
-using PlateSecure.Application.DTOs;
+﻿using PlateSecure.Application.DTOs;
 using PlateSecure.Domain.Documents;
 
 namespace PlateSecure.Application.Interfaces;
 
 public interface IDetectionService
 {
-    Task<DetectionResponse> ProcessDetectionsAsync(DetectionRequest request);
-    Task<IEnumerable<DetectionLog>> GetLogsAsync();
-    Task<IEnumerable<ParkingEvent>> GetParkingEventsAsync();
+    Task<IEnumerable<DetectionResponse>> ProcessDetectionsAsync(DetectionRequest request);
+    Task<IEnumerable<DetectionResponse>> GetLogsAsync();
+    Task<IEnumerable<ParkingEventResponse>> GetParkingEventsAsync();
+    Task<ParkingEventResponse> GetEventWithLogsAsync(string objectId);
     Task<ParkingEventResponse> CheckOutAsync(ExitRequest dto);
     Task<ParkingEventResponse> UpdatePaymentAsync(string id, PaymentUpdateDto dto);
 }

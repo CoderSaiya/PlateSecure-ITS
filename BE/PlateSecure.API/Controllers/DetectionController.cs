@@ -94,5 +94,22 @@ namespace PlateSecure.Controllers
             var events = await detectionService.GetParkingEventsAsync();
             return Ok(events);
         }
+        
+        [HttpGet("event/{id}")]
+        public async Task<IActionResult> GetPlateEvent(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+                return BadRequest("Event id is required.");
+
+            try
+            {
+                var dto = await detectionService.GetEventWithLogsAsync(id);
+                return Ok(dto);
+            }
+            catch (InvalidOperationException)
+            {
+                return NotFound($"Không tìm thấy event với id = {id}");
+            }
+        }
     }
 }

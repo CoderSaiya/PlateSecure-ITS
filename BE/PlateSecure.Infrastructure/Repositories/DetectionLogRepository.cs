@@ -1,4 +1,5 @@
-﻿using MongoDB.Driver;
+﻿using MongoDB.Bson;
+using MongoDB.Driver;
 using PlateSecure.Domain.Documents;
 using PlateSecure.Domain.Interfaces;
 using PlateSecure.Infrastructure.Persistence;
@@ -22,5 +23,15 @@ public class DetectionLogRepository(MongoDbContext dbContext) : IDetectionLogRep
     {
         var filter = Builders<DetectionLog>.Filter.Empty;
         return await dbContext.DetectionLogs.Find(filter).ToListAsync();
+    }
+    
+    public async Task<DetectionLog?> GetLogByEventIdAndTypeAsync(ObjectId eventId, bool isEntry)
+    {
+        var filter = Builders<DetectionLog>.Filter.And(
+            Builders<DetectionLog>.Filter.Eq(x => x.ParkingEventId, eventId),
+            Builders<DetectionLog>.Filter.Eq(x => x.IsEntry, isEntry)
+        );
+        return await dbContext.DetectionLogs.Find(filter)
+            .FirstOrDefaultAsync();
     }
 }

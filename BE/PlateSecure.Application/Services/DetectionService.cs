@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Collections;
+using Microsoft.Extensions.Logging;
 using MongoDB.Bson;
 using PlateSecure.Application.DTOs;
 using PlateSecure.Application.Interfaces;
@@ -13,7 +14,7 @@ public class DetectionService(
     ILogger<DetectionService> logger
     ) : IDetectionService
 {
-    public async Task<DetectionResponse> ProcessDetectionsAsync(DetectionRequest request)
+    public async Task<IEnumerable<DetectionResponse>> ProcessDetectionsAsync(DetectionRequest request)
     {
         if (request.ImageData.Count != request.ConfidenceScores.Count ||
             request.ImageData.Count != request.LicensePlates.Count)
@@ -21,55 +22,105 @@ public class DetectionService(
             throw new ArgumentException("Các danh sách không cùng độ dài");
         }
 
+        var responses = new List<DetectionResponse>();
+
         for (int i = 0; i < request.ImageData.Count; i++)
         {
             var bytes = request.ImageData[i];
+            var plate = string.IsNullOrWhiteSpace(request.LicensePlates[i])
+                ? null
+                : request.LicensePlates[i];
+
+            // Nếu có biển số thì tạo event trước
+            ObjectId? eventId = null;
+            if (!string.IsNullOrEmpty(plate))
+            {
+                var evt = new ParkingEvent
+                {
+                    LicensePlate = plate,
+                    EntryGate    = request.Gate,
+                    IsCheckIn    = true,
+                    Fee          = 5000,
+                };
+                await parkingEventRepository.InsertParkingEventAsync(evt);
+                eventId = evt.Id;
+                logger.LogInformation("Đã tạo sự kiện đỗ xe #{EventId} cho {Plate}", evt.Id, plate);
+            }
+
+            // Tạo log, gán eventId nếu có
             var log = new DetectionLog
             {
-                ImageData = bytes,
-                ConfidenceScore = request.ConfidenceScores[i],
-                LicensePlate = string.IsNullOrWhiteSpace(request.LicensePlates[i])
-                    ? null
-                    : request.LicensePlates[i],
+                ImageData      = bytes,
+                ConfidenceScore= request.ConfidenceScores[i],
+                LicensePlate   = plate,
+                IsEntry        = plate != null,
+                ParkingEventId = eventId
             };
 
-            try
-            {
-                // Lưu ảnh lên GridFS và log
-                await detectionLogRepository.InsertDetectionLogAsync(log);
-                logger.LogInformation("Saved detection log #{Index}", i);
-
-                if (!string.IsNullOrEmpty(log.LicensePlate))
-                {
-                    var evt = new ParkingEvent
-                    {
-                        LicensePlate = log.LicensePlate,
-                        EntryGate = request.Gate,
-                        IsCheckIn = true,
-                        Fee = 5000,
-                    };
-                    await parkingEventRepository.InsertParkingEventAsync(evt);
-                    logger.LogInformation("Created parking event for {Plate}", log.LicensePlate);
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogError(ex, "Error at index {Index}", i);
-                throw;
-            }
+            await detectionLogRepository.InsertDetectionLogAsync(log);
+            logger.LogInformation("Nhật ký phát hiện đã lưu #{Index}", i);
+            
+            responses.Add(new DetectionResponse(
+                log.Id.ToString(),
+                plate,
+                log.ConfidenceScore,
+                log.IsEntry,
+                bytes
+            ));
         }
 
-        return new DetectionResponse("Processed successfully");
+        return responses;
     }
     
-    public async Task<IEnumerable<DetectionLog>> GetLogsAsync()
+    public async Task<IEnumerable<DetectionResponse>> GetLogsAsync()
     {
-        return await detectionLogRepository.GetLogsAsync();
+        var logResponse = new List<DetectionResponse>();
+        var logs = await detectionLogRepository.GetLogsAsync();
+        foreach (var log in logs)
+        {
+            logResponse.Add(new DetectionResponse(log.Id.ToString(), log.LicensePlate, log.ConfidenceScore, log.IsEntry, log.ImageData));
+        }
+        return logResponse;
     }
 
-    public async Task<IEnumerable<ParkingEvent>> GetParkingEventsAsync()
+    public async Task<IEnumerable<ParkingEventResponse>> GetParkingEventsAsync()
     {
-        return await parkingEventRepository.GetAllAsync();
+        var eventResponse = new List<ParkingEventResponse>();
+        var events = await parkingEventRepository.GetAllAsync();
+        foreach (var parkingEvent in events)
+        {
+            var ids = parkingEvent.Id.ToString();
+            var entryLog = await detectionLogRepository.GetLogByEventIdAndTypeAsync(parkingEvent.Id, true);
+            var exitLog = await detectionLogRepository.GetLogByEventIdAndTypeAsync(parkingEvent.Id, false);
+            eventResponse.Add(new ParkingEventResponse(
+                ids, 
+                parkingEvent.LicensePlate, 
+                parkingEvent.EntryGate, 
+                parkingEvent.ExitGate, 
+                parkingEvent.IsCheckIn, 
+                parkingEvent.Fee,
+                parkingEvent.IsPaid,
+                parkingEvent.CreateDate,
+                parkingEvent.UpdateDate,
+                ToResponse(entryLog),
+                ToResponse(exitLog)));
+        }
+
+        return eventResponse;
+    }
+
+    public async Task<ParkingEventResponse> GetEventWithLogsAsync(string objectId)
+    {
+        ObjectId.TryParse(objectId, out var id);
+        
+        var existingEvent = await parkingEventRepository.GetByIdAsync(id);
+        if (existingEvent is null) 
+            throw new InvalidOperationException("Không tìm thấy event");
+
+        var entryLog = await detectionLogRepository.GetLogByEventIdAndTypeAsync(id, true);
+        var exitLog = await detectionLogRepository.GetLogByEventIdAndTypeAsync(id, false);
+        
+        return MapToDto(existingEvent, ToResponse(entryLog), ToResponse(exitLog));
     }
     
     public async Task<ParkingEventResponse> CheckOutAsync(ExitRequest dto)
@@ -87,7 +138,7 @@ public class DetectionService(
         last.UpdateDate = DateTime.UtcNow;
         await parkingEventRepository.UpdateParkingEventAsync(last);
 
-        logger.LogInformation("Checked‑out {Plate} at {Gate}", dto.LicensePlate, dto.ExitGate);
+        logger.LogInformation("Đã kiểm tra {Plate} tại {Gate}", dto.LicensePlate, dto.ExitGate);
 
         return MapToDto(last);
     }
@@ -105,12 +156,12 @@ public class DetectionService(
         evt.UpdateDate = DateTime.UtcNow;
         await parkingEventRepository.UpdateParkingEventAsync(evt);
 
-        logger.LogInformation("Updated payment for event {Id}: IsPaid={Paid}", id, dto.IsPaid);
+        logger.LogInformation("Cập nhật thanh toán cho sự kiện {Id}: IsPaid={Paid}", id, dto.IsPaid);
 
         return MapToDto(evt);
     }
     
-    private static ParkingEventResponse MapToDto(ParkingEvent e) 
+    private static ParkingEventResponse MapToDto(ParkingEvent e, DetectionResponse? entryLog = null, DetectionResponse? exitLog = null) 
         => new (
         e.Id.ToString(),
         e.LicensePlate,
@@ -120,6 +171,20 @@ public class DetectionService(
         e.Fee,
         e.IsPaid,
         e.CreateDate,
-        e.UpdateDate
+        e.UpdateDate,
+        entryLog,
+        exitLog
     );
+
+    private static DetectionResponse ToResponse(DetectionLog? log)
+    {
+        if(log is null) return null;
+        return new DetectionResponse(
+            log.Id.ToString(),
+            log.LicensePlate,
+            log.ConfidenceScore,
+            log.IsEntry,
+            log.ImageData
+        );
+    }
 }
