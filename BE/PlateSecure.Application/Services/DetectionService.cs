@@ -16,56 +16,49 @@ public class DetectionService(
 {
     public async Task<IEnumerable<DetectionResponse>> ProcessDetectionsAsync(DetectionRequest request)
     {
-        if (request.ImageData.Count != request.ConfidenceScores.Count ||
-            request.ImageData.Count != request.LicensePlates.Count)
+        if (request.ImageData.Count != request.ConfidenceScores.Count)
+            throw new ArgumentException("Số lượng ảnh và điểm tin cậy không khớp");
+
+        ObjectId? eventId = null;
+        if (!string.IsNullOrWhiteSpace(request.LicensePlate))
         {
-            throw new ArgumentException("Các danh sách không cùng độ dài");
+            var evt = new ParkingEvent
+            {
+                LicensePlate = request.LicensePlate,
+                EntryGate    = request.Gate,
+                IsCheckIn    = true,
+                Fee          = -1,
+            };
+            await parkingEventRepository.InsertParkingEventAsync(evt);
+            eventId = evt.Id;
+            logger.LogInformation("Đã tạo sự kiện đỗ xe #{EventId} cho {Plate}", evt.Id, request.LicensePlate);
         }
 
         var responses = new List<DetectionResponse>();
 
         for (int i = 0; i < request.ImageData.Count; i++)
         {
-            var bytes = request.ImageData[i];
-            var plate = string.IsNullOrWhiteSpace(request.LicensePlates[i])
-                ? null
-                : request.LicensePlates[i];
+            var img = request.ImageData[i];
+            var score = request.ConfidenceScores[i];
 
-            // Nếu có biển số thì tạo event trước
-            ObjectId? eventId = null;
-            if (!string.IsNullOrEmpty(plate))
-            {
-                var evt = new ParkingEvent
-                {
-                    LicensePlate = plate,
-                    EntryGate    = request.Gate,
-                    IsCheckIn    = true,
-                    Fee          = 5000,
-                };
-                await parkingEventRepository.InsertParkingEventAsync(evt);
-                eventId = evt.Id;
-                logger.LogInformation("Đã tạo sự kiện đỗ xe #{EventId} cho {Plate}", evt.Id, plate);
-            }
-
-            // Tạo log, gán eventId nếu có
             var log = new DetectionLog
             {
-                ImageData      = bytes,
-                ConfidenceScore= request.ConfidenceScores[i],
-                LicensePlate   = plate,
-                IsEntry        = plate != null,
+                ImageData      = img,
+                ConfidenceScore= score,
+                LicensePlate   = request.LicensePlate,
+                IsEntry        = !string.IsNullOrWhiteSpace(request.LicensePlate),
                 ParkingEventId = eventId
             };
 
             await detectionLogRepository.InsertDetectionLogAsync(log);
             logger.LogInformation("Nhật ký phát hiện đã lưu #{Index}", i);
-            
+
             responses.Add(new DetectionResponse(
                 log.Id.ToString(),
-                plate,
-                log.ConfidenceScore,
+                request.LicensePlate,
+                score,
                 log.IsEntry,
-                bytes
+                img
             ));
         }
 
@@ -123,22 +116,25 @@ public class DetectionService(
         return MapToDto(existingEvent, ToResponse(entryLog), ToResponse(exitLog));
     }
     
-    public async Task<ParkingEventResponse> CheckOutAsync(ExitRequest dto)
+    public async Task<ParkingEventResponse> CheckOutAsync(ExitRequest request)
     {
+        if (request.ImageData.Count != request.ConfidenceScores.Count)
+            throw new ArgumentException("Số lượng ảnh và điểm tin cậy không khớp");
+        
         // Tìm event check‑in gần nhất
-        var last = await parkingEventRepository.GetLatestEventByLicensePlateAsync(dto.LicensePlate);
+        var last = await parkingEventRepository.GetLatestEventByLicensePlateAsync(request.LicensePlate);
         if (last == null || !last.IsCheckIn || !string.IsNullOrEmpty(last.ExitGate))
             throw new InvalidOperationException("Không tìm thấy sự kiện check‑in mở cho biển số này.");
 
         // Cập nhật exit gate & chuyển trạng thái
-        last.ExitGate = dto.ExitGate;
+        last.ExitGate = request.ExitGate;
         last.IsCheckIn = false;
-        last.Fee = dto.Fee;
+        last.Fee = request.Fee;
         last.IsPaid = true;
         last.UpdateDate = DateTime.UtcNow;
         await parkingEventRepository.UpdateParkingEventAsync(last);
 
-        logger.LogInformation("Đã kiểm tra {Plate} tại {Gate}", dto.LicensePlate, dto.ExitGate);
+        logger.LogInformation("Đã kiểm tra {Plate} tại {Gate}", request.LicensePlate, request.ExitGate);
 
         return MapToDto(last);
     }

@@ -27,9 +27,9 @@ namespace PlateSecure.Controllers
         
             // Build your request DTO
             var request = new DetectionRequest(
-                new List<byte[]>    { bytes },
-                new List<double>    { dto.ConfidenceScore },
-                new List<string?>   { dto.LicensePlate },
+                new List<byte[]> { bytes },
+                new List<double> { dto.ConfidenceScore },
+                dto.LicensePlate,
                 (dto.GateIn ?? dto.GateOut)!,
                 dto.GateOut is not null
             );
@@ -47,12 +47,25 @@ namespace PlateSecure.Controllers
         }
         
         [HttpPost("exit")]
+        [Consumes("multipart/form-data")]
         public async Task<IActionResult> HandleExitEvent(
-            [FromForm] ExitRequest dto)
+            [FromForm] ExitEventDto dto)
         {
             try
             {
-                var res = await detectionService.CheckOutAsync(dto);
+                // Read image bytes
+                await using var ms = new MemoryStream();
+                await dto.Image.CopyToAsync(ms);
+                var bytes = ms.ToArray();
+                
+                var request = new ExitRequest(
+                    new List<byte[]> { bytes }, 
+                    new List<double> { dto.ConfidenceScore }, 
+                    dto.LicensePlate, 
+                    dto.ExitGate, 
+                    dto.Fee);
+                
+                var res = await detectionService.CheckOutAsync(request);
                 return Ok(res);
             }
             catch (InvalidOperationException ioe)
