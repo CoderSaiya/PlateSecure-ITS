@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.OpenApi.Models;
 using PlateSecure.Application.DTOs;
 using PlateSecure.Infrastructure.Configuration;
 using PlateSecure.Infrastructure.Persistence;
@@ -13,7 +14,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new() { Title = "PlateSecure API", Version = "v1" });
+    c.SwaggerDoc("v1", new OpenApiInfo {
+        Title = "Plate Secure",
+        Version = "v1",
+    });
     c.OperationFilter<FileUploadOperationFilter>();
 });
 
@@ -44,8 +48,13 @@ var app = builder.Build();
 // 3. Chỉ bật Swagger UI khi dev
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwagger(c =>
+    {
+        c.OpenApiVersion = Microsoft.OpenApi.OpenApiSpecVersion.OpenApi2_0;
+    });
+    app.UseSwaggerUI(c => {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Plate Secure v1");
+    });
 }
 app.UseHttpsRedirection();
 

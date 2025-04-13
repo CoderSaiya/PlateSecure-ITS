@@ -11,4 +11,5 @@ public interface IDetectionService
     Task<ParkingEventResponse> GetEventWithLogsAsync(string objectId);
     Task<ParkingEventResponse> CheckOutAsync(ExitRequest dto);
     Task<ParkingEventResponse> UpdatePaymentAsync(string id, PaymentUpdateDto dto);
+    Task<IEnumerable<StatisticsResponse>> GetStatisticsAsync(DateTime? startDate, DateTime? endDate, string groupBy);
 }

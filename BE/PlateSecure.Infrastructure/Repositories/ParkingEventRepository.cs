@@ -38,4 +38,17 @@ public class ParkingEventRepository(MongoDbContext dbContext) : IParkingEventRep
         var filter = Builders<ParkingEvent>.Filter.Eq(x => x.Id, parkingEvent.Id);
         return dbContext.ParkingEvents.ReplaceOneAsync(filter, parkingEvent);
     }
+    
+    public async Task<IEnumerable<ParkingEvent>> GetEventsByDateRangeAsync(DateTime? startDate, DateTime? endDate)
+    {
+        var filterBuilder = Builders<ParkingEvent>.Filter;
+        var filter = FilterDefinition<ParkingEvent>.Empty;
+
+        if (startDate.HasValue)
+            filter &= filterBuilder.Gte(e => e.CreateDate, startDate.Value);
+        if (endDate.HasValue)
+            filter &= filterBuilder.Lte(e => e.CreateDate, endDate.Value);
+
+        return await dbContext.ParkingEvents.Find(filter).ToListAsync();
+    }
 }

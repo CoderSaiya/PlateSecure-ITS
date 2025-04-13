@@ -10,4 +10,5 @@ public interface IParkingEventRepository
     Task<ParkingEvent?> GetLatestEventByLicensePlateAsync(string licensePlate);
     Task<ParkingEvent?> GetByIdAsync(ObjectId id);
     Task UpdateParkingEventAsync(ParkingEvent parkingEvent);
+    Task<IEnumerable<ParkingEvent>> GetEventsByDateRangeAsync(DateTime? startDate, DateTime? endDate);
 }

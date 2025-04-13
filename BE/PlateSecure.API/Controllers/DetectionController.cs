@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Globalization;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using PlateSecure.Application.DTOs;
 using PlateSecure.Application.Interfaces;
@@ -123,6 +124,131 @@ namespace PlateSecure.Controllers
             {
                 return NotFound($"Không tìm thấy event với id = {id}");
             }
+        }
+        
+        [HttpGet("statistics")]
+        public async Task<IActionResult> GetStatistics(
+            [FromQuery] string? startDate,
+            [FromQuery] string? endDate,
+            [FromQuery] string groupBy)
+        {
+            var validGroupBys = new[] { "day", "month", "year", "monthofyear" };
+            if (!string.IsNullOrEmpty(groupBy) && !validGroupBys.Contains(groupBy.ToLower()))
+            {
+                return BadRequest("Invalid groupBy value. Allowed values: day, month, year.");
+            }
+            
+            DateTime? parsedStartDate = null;
+            DateTime? parsedEndDate = null;
+            
+            // Hàm phụ trợ để parse ngày theo groupBy
+            DateTime? ParseDate(string dateInput, string group)
+            {
+                if (string.IsNullOrEmpty(dateInput))
+                {
+                    return null;
+                }
+
+                switch (group?.ToLower())
+                {
+                    case "year":
+                        // Định dạng: yyyy
+                        if (int.TryParse(dateInput, out int year))
+                        {
+                            return new DateTime(year, 1, 1);
+                        }
+                        else
+                        {
+                            return null;
+                        }
+
+                    case "month":
+                        // Định dạng: yyyy-MM
+                        if (DateTime.TryParseExact(dateInput, "yyyy-MM", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime monthDate))
+                        {
+                            return monthDate;
+                        }
+                        else
+                        {
+                            return null;
+                        }
+                    
+                    case "monthofyear":
+                        // Định dạng: yyyy
+                        if (DateTime.TryParseExact(dateInput, "yyyy", CultureInfo.InvariantCulture,
+                                DateTimeStyles.None, out DateTime yearForMonth))
+                        {
+                            return yearForMonth;
+                        }
+                        break;
+
+                    default:
+                        // Mặc định: nhập ngày đầy đủ theo định dạng "yyyy-MM-dd"
+                        if (DateTime.TryParseExact(dateInput, "yyyy-MM-dd", CultureInfo.InvariantCulture,
+                                DateTimeStyles.None, out DateTime dayDate))
+                        {
+                            return dayDate;
+                        }
+                        // Nếu không trùng khớp, thử dùng TryParse thông thường
+                        if (DateTime.TryParse(dateInput, out DateTime dt))
+                        {
+                            return dt;
+                        }
+                        break;
+                }
+                return null;
+            }
+            
+            if (groupBy == "monthofyear")
+            {
+                // Đối với groupBy = "monthofyear", bắt buộc phải có startDate dưới dạng năm ("yyyy")
+                if (string.IsNullOrEmpty(startDate))
+                {
+                    return BadRequest("For groupBy 'monthofyear', startDate is required and must contain a year (format: yyyy).");
+                }
+                parsedStartDate = ParseDate(startDate, groupBy);
+                if (parsedStartDate == null)
+                {
+                    return BadRequest("Invalid startDate format for groupBy 'monthofyear'. Expected 'yyyy'.");
+                }
+            }
+            else
+            {
+                // Các trường hợp còn lại: "day", "month", "year"
+                if (!string.IsNullOrEmpty(startDate))
+                {
+                    parsedStartDate = ParseDate(startDate, groupBy);
+                    if (parsedStartDate == null)
+                    {
+                        string expectedFormat = groupBy switch
+                        {
+                            "year" => "yyyy",
+                            "month" => "yyyy-MM",
+                            _ => "yyyy-MM-dd"
+                        };
+                        return BadRequest($"Invalid startDate format for groupBy '{groupBy}'. Expected '{expectedFormat}'.");
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(endDate))
+            {
+                // Với endDate ta sử dụng cùng định dạng như startDate của các groupBy khác (không áp dụng cho "monthofyear")
+                parsedEndDate = ParseDate(endDate, groupBy == "monthofyear" ? "year" : groupBy);
+                if (parsedEndDate == null)
+                {
+                    string expectedFormat = groupBy switch
+                    {
+                        "year" or "monthofyear" => "yyyy",
+                        "month" => "yyyy-MM",
+                        _ => "yyyy-MM-dd"
+                    };
+                    return BadRequest($"Invalid endDate format for groupBy '{groupBy}'. Expected '{expectedFormat}'.");
+                }
+            }
+
+            var result = await detectionService.GetStatisticsAsync(parsedStartDate, parsedEndDate, groupBy);
+            return Ok(result);
         }
     }
 }

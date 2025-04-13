@@ -183,4 +183,76 @@ public class DetectionService(
             log.ImageData
         );
     }
+    
+    public async Task<IEnumerable<StatisticsResponse>> GetStatisticsAsync(DateTime? startDate, DateTime? endDate, string groupBy)
+    {
+        var events = await parkingEventRepository.GetEventsByDateRangeAsync(startDate, endDate);
+        
+        if (startDate.HasValue)
+            events = events.Where(e => e.CreateDate >= startDate.Value);
+        if (endDate.HasValue)
+            events = events.Where(e => e.CreateDate <= endDate.Value);
+        
+        IEnumerable<StatisticsResponse> statistics;
+        
+        // Mặc định nếu groupBy không được truyền thì group theo ngày
+        groupBy = string.IsNullOrWhiteSpace(groupBy) ? "day" : groupBy.ToLower();
+        
+        switch (groupBy)
+        {
+            case "day":
+                statistics = events.GroupBy(e => e.CreateDate.Date)
+                    .Select(g => new StatisticsResponse
+                    {
+                        Period = g.Key.ToString("yyyy-MM-dd"),
+                        TotalEvents = g.Count(),
+                        TotalRevenue = g.Sum(e => e.Fee)
+                    });
+                break;
+            case "month":
+                statistics = events.GroupBy(e => new { e.CreateDate.Year, e.CreateDate.Month })
+                    .Select(g => new StatisticsResponse
+                    {
+                        Period = $"{g.Key.Year}-{g.Key.Month:D2}",
+                        TotalEvents = g.Count(),
+                        TotalRevenue = g.Sum(e => e.Fee)
+                    });
+                break;
+            case "year":
+                statistics = events.GroupBy(e => e.CreateDate.Year)
+                    .Select(g => new StatisticsResponse
+                    {
+                        Period = g.Key.ToString(),
+                        TotalEvents = g.Count(),
+                        TotalRevenue = g.Sum(e => e.Fee)
+                    });
+                break;
+            case "monthofyear":
+                
+            {
+                // Nếu không có startDate để xác định năm thì trả về lỗi
+                if (!startDate.HasValue)
+                {
+                    throw new ArgumentException("Để thống kê theo từng tháng của năm, bạn cần truyền startDate chứa năm.");
+                }
+
+                int targetYear = startDate.Value.Year;
+                // Lọc các sự kiện chỉ trong năm đã chỉ định
+                var eventsForYear = events.Where(e => e.CreateDate.Year == targetYear);
+                statistics = eventsForYear.GroupBy(e => e.CreateDate.Month)
+                    .Select(g => new StatisticsResponse
+                    {
+                        Period = $"{targetYear}-{g.Key:D2}",
+                        TotalEvents = g.Count(),
+                        TotalRevenue = g.Sum(e => e.Fee)
+                    });
+            }
+                break;
+            default:
+                statistics = Enumerable.Empty<StatisticsResponse>();
+                break;
+        }
+        
+        return statistics.OrderBy(s => s.Period);
+    }
 }
