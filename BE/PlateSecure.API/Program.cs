@@ -5,7 +5,7 @@ using PlateSecure.Application.DTOs;
 using PlateSecure.Infrastructure.Configuration;
 using PlateSecure.Infrastructure.Persistence;
 using PlateSecure.Infrastructure.Settings;
-
+using PlateSecure.Security.Middlewares;
 using JsonOptions = Microsoft.AspNetCore.Mvc.JsonOptions;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -69,7 +69,14 @@ if (app.Environment.IsDevelopment())
 }
 app.UseHttpsRedirection();
 
+app.UseRouting();
+
 app.UseCors();
+
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseMiddleware<NotFoundMiddleware>();
+app.UseMiddleware<CheckRoleMiddleware>();
 
 app.MapControllers();
 

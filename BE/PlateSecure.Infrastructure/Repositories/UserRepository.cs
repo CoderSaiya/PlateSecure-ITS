@@ -18,7 +18,7 @@ public class UserRepository(MongoDbContext dbContext) : IUserRepository
         return await dbContext.Users.Find(filter).ToListAsync();
     }
     
-    public async Task<User> GetUserByUsernameAsync(string username)
+    public async Task<User?> GetUserByUsernameAsync(string username)
     {
         var filter = Builders<User>.Filter.Eq(u => u.Username, username);
         return await dbContext.Users.Find(filter).FirstOrDefaultAsync();

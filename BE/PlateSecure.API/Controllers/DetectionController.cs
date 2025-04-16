@@ -102,7 +102,7 @@ namespace PlateSecure.Controllers
             return Ok(logs);
         }
         
-        [HttpGet("event")]
+        [HttpGet("events")]
         public async Task<IActionResult> GetEvent()
         {
             var events = await detectionService.GetParkingEventsAsync();
