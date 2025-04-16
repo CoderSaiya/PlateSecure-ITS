@@ -13,8 +13,10 @@ public static class DependencyInjection
     {
         services.AddScoped<IDetectionLogRepository, DetectionLogRepository>();
         services.AddScoped<IParkingEventRepository, ParkingEventRepository>();
+        services.AddScoped<IUserRepository, UserRepository>();
 
         services.AddScoped<IDetectionService, DetectionService>();
+        services.AddScoped<IUserService, UserService>();
         
         return services;
     }

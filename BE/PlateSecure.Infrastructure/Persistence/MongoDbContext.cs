@@ -20,4 +20,7 @@ public class MongoDbContext
 
     public IMongoCollection<ParkingEvent> ParkingEvents =>
         _database.GetCollection<ParkingEvent>("ParkingEvents");
+    
+    public IMongoCollection<User> Users =>
+        _database.GetCollection<User>("Users");
 }

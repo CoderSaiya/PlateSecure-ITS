@@ -21,6 +21,17 @@ builder.Services.AddSwaggerGen(c =>
     c.OperationFilter<FileUploadOperationFilter>();
 });
 
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(builder =>
+    {
+        builder.WithOrigins("http://127.0.0.1:5500")
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
+
 // 2. MongoDB + DI
 builder.Services.Configure<MongoDbSettings>(
     builder.Configuration.GetSection("MongoDBSettings"));
@@ -57,6 +68,8 @@ if (app.Environment.IsDevelopment())
     });
 }
 app.UseHttpsRedirection();
+
+app.UseCors();
 
 app.MapControllers();
 
