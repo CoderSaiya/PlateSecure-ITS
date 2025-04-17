@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using PlateSecure.Application.DTOs;
 using PlateSecure.Application.Interfaces;
+using PlateSecure.Domain.Specifications;
 
 namespace PlateSecure.Controllers
 {
@@ -96,16 +97,24 @@ namespace PlateSecure.Controllers
         }
         
         [HttpGet("logs")]
-        public async Task<IActionResult> GetLogs()
+        public async Task<IActionResult> GetLogs([FromQuery] DetectionLogFilter? filter)
         {
-            var logs = await detectionService.GetLogsAsync();
+            var allowedSortFields = new[] { "Id", "CreateDate", "UpdateDate", "LicensePlate", "ConfidenceScore", "ParkingEventId", "IsEntry" };
+            if (filter is not null && !allowedSortFields.Contains(filter.SortBy))
+                return BadRequest("Invalid sort field");
+            
+            var logs = await detectionService.GetLogsAsync(filter);
             return Ok(logs);
         }
         
         [HttpGet("events")]
-        public async Task<IActionResult> GetEvent()
+        public async Task<IActionResult> GetEvent([FromQuery] ParkingEventFilter? filter)
         {
-            var events = await detectionService.GetParkingEventsAsync();
+            var allowedSortFields = new[] { "Id", "CreateDate", "UpdateDate", "LicensePlate", "EntryGate", "ExitGate", "IsCheckIn", "Fee", "IsPaid" };
+            if (filter is not null && !allowedSortFields.Contains(filter.SortBy))
+                return BadRequest("Invalid sort field");
+            
+            var events = await detectionService.GetParkingEventsAsync(filter);
             return Ok(events);
         }
         
@@ -249,6 +258,34 @@ namespace PlateSecure.Controllers
 
             var result = await detectionService.GetStatisticsAsync(parsedStartDate, parsedEndDate, groupBy);
             return Ok(result);
+        }
+
+        [HttpPut("logs")]
+        public async Task<IActionResult> UpdateLog([FromRoute] string id, [FromBody] DetectionLogUpdateDto dto)
+        {
+            await detectionService.UpdateDetectionLogAsync(id, dto);
+            return Ok("Updated log");
+        }
+        
+        [HttpPut("events")]
+        public async Task<IActionResult> UpdateEvent([FromRoute] string id, [FromBody] ParkingEventUpdateDto dto)
+        {
+            await detectionService.UpdateParkingEventAsync(id, dto);
+            return Ok("Updated event");
+        }
+
+        [HttpDelete("logs")]
+        public async Task<IActionResult> DeleteLog([FromRoute] string id)
+        {
+            await detectionService.DeleteDetectionLogAsync(id);
+            return Ok("Deleted log");
+        }
+        
+        [HttpDelete("events")]
+        public async Task<IActionResult> DeleteParkingEvent([FromRoute] string id)
+        {
+            await detectionService.DeleteDetectionLogAsync(id);
+            return Ok("Deleted log");
         }
     }
 }
