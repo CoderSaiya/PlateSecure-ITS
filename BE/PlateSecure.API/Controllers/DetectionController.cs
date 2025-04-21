@@ -261,31 +261,43 @@ namespace PlateSecure.Controllers
         }
 
         [HttpPut("logs")]
-        public async Task<IActionResult> UpdateLog([FromRoute] string id, [FromBody] DetectionLogUpdateDto dto)
+        public async Task<IActionResult> UpdateLog([FromQuery] string id, [FromBody] DetectionLogUpdateDto dto)
         {
+            if (string.IsNullOrWhiteSpace(id))
+                return BadRequest("Id là bắt buộc.");
+            
             await detectionService.UpdateDetectionLogAsync(id, dto);
             return Ok("Updated log");
         }
         
         [HttpPut("events")]
-        public async Task<IActionResult> UpdateEvent([FromRoute] string id, [FromBody] ParkingEventUpdateDto dto)
+        public async Task<IActionResult> UpdateEvent([FromQuery] string id, [FromBody] ParkingEventUpdateDto dto)
         {
+            if (string.IsNullOrWhiteSpace(id))
+                return BadRequest("Id là bắt buộc.");
+            
             await detectionService.UpdateParkingEventAsync(id, dto);
             return Ok("Updated event");
         }
 
         [HttpDelete("logs")]
-        public async Task<IActionResult> DeleteLog([FromRoute] string id)
+        public async Task<IActionResult> DeleteLog([FromQuery] string id)
         {
+            if (string.IsNullOrWhiteSpace(id))
+                return BadRequest("Id là bắt buộc.");
+            
             await detectionService.DeleteDetectionLogAsync(id);
             return Ok("Deleted log");
         }
         
         [HttpDelete("events")]
-        public async Task<IActionResult> DeleteParkingEvent([FromRoute] string id)
+        public async Task<IActionResult> DeleteParkingEvent([FromQuery] string id)
         {
-            await detectionService.DeleteDetectionLogAsync(id);
-            return Ok("Deleted log");
+            if (string.IsNullOrWhiteSpace(id))
+                return BadRequest("Id là bắt buộc.");
+            
+            await detectionService.DeleteParkingEventAsync(id);
+            return Ok("Deleted events");
         }
     }
 }
