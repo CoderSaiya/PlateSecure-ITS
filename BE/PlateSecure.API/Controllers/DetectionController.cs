@@ -261,7 +261,7 @@ namespace PlateSecure.Controllers
         }
 
         [HttpPut("logs")]
-        public async Task<IActionResult> UpdateLog([FromForm] string id, [FromBody] DetectionLogUpdateDto dto)
+        public async Task<IActionResult> UpdateLog([FromQuery] string id, [FromForm] DetectionLogUpdateDto dto)
         {
             if (string.IsNullOrWhiteSpace(id))
                 return BadRequest("Id là bắt buộc.");
@@ -271,7 +271,7 @@ namespace PlateSecure.Controllers
         }
         
         [HttpPut("events")]
-        public async Task<IActionResult> UpdateEvent([FromForm] string id, [FromBody] ParkingEventUpdateDto dto)
+        public async Task<IActionResult> UpdateEvent([FromQuery] string id, [FromForm] ParkingEventUpdateDto dto)
         {
             if (string.IsNullOrWhiteSpace(id))
                 return BadRequest("Id là bắt buộc.");

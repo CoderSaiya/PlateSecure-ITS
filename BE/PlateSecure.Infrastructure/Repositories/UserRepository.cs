@@ -73,7 +73,7 @@ public class UserRepository(MongoDbContext dbContext) : IUserRepository
 
     public async Task DeleteAsync(ObjectId id)
     {
-        var filter = Builders<ParkingEvent>.Filter.Eq(x => x.Id, id);
-        await dbContext.ParkingEvents.DeleteOneAsync(filter);
+        var filter = Builders<User>.Filter.Eq(x => x.Id, id);
+        await dbContext.Users.DeleteOneAsync(filter);
     }
 }

@@ -21,7 +21,7 @@ public class UserController(IUserService userService) : Controller
     }
 
     [HttpPut]
-    public async Task<IActionResult> UpdateUser([FromRoute] string id, [FromBody] UserDto dto)
+    public async Task<IActionResult> UpdateUser([FromQuery] string id, [FromForm] UserDto dto)
     {
         await userService.UpdateUserAsync(id, dto);
         return Ok("User updated");
