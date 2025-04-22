@@ -74,7 +74,7 @@ public class DetectionLogRepository(MongoDbContext dbContext) : IDetectionLogRep
 
     public async Task<DetectionLog?> GetByIdAsync(ObjectId eventId)
     {
-        var filter = Builders<DetectionLog>.Filter.Eq(x => x.ParkingEventId, eventId);
+        var filter = Builders<DetectionLog>.Filter.Eq(x => x.Id, eventId);
         return await dbContext.DetectionLogs.Find(filter).FirstOrDefaultAsync();
     }
 
